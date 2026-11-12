@@ -1,7 +1,5 @@
-.git
-data/
-__pycache__/
-*.pyc
-*.md
-*.bat
 .env
+.git
+__pycache__/
+node_modules/
+dist/

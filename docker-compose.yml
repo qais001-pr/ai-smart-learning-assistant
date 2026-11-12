@@ -1,15 +1,23 @@
 services:
-  api:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+  backend:
+    build: ./backend
     container_name: ai-api
-    ports:
-      - "8000:8000"
     env_file:
       - .env
     volumes:
       - app_data:/app/data
+    expose:
+      - "8000"          # only reachable inside the compose network
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: ai-web
+    ports:
+      - "3000:80"       # open http://localhost:3000
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   app_data:

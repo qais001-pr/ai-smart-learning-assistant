@@ -4,7 +4,7 @@
 
 SmartStudy AI is a web app that helps students learn: it **generates quizzes**, **explains difficult topics**, and **creates personalized study plans**. The AI is powered by the **Google Gemini API** (needs internet and a free API key).
 
-**Made by:** [Daniyal] | **Class  
+**Made by:** [Daniyal] | **Class:** [ICS REG II]
 **Event:** Science Exhibition | **Supervisor:** [Muhammad Qais]
 
 ---
@@ -16,7 +16,7 @@ Students find it hard to understand complex concepts, prepare for exams, practic
 | Module | Feature |
 |---|---|
 | Authentication | Student sign up and login (passwords stored hashed, sessions expire after 7 days) |
-| Dashboard | Welcome message, three tool cards, profile, and recent activities |
+| Dashboard | Welcome message, three tool cards, and recent activities |
 | **Quiz Generator** | Subject, topic, difficulty (Easy/Medium/Hard), and 5/10/15 questions. The quiz is checked **on the server** and shows total, correct, incorrect, and score % with a review |
 | **Topic Explainer** | Subject, topic, and level (Beginner/Intermediate/Advanced). Gives a Simple Definition, How It Works, Real-World Example, Important Concepts, and Key Points |
 | **Study Planner** | Subjects, daily hours, exam date, level, and priority subject. Gives a Day/Date/Subject/Topic/Duration table, with extra time for the priority subject |
@@ -26,29 +26,34 @@ Students find it hard to understand complex concepts, prepare for exams, practic
 
 ## 3. How It Works
 ```
-Student (Browser: HTML/CSS/JS)
-        │  HTTP + login token
+Student (Browser)
+        │  http://localhost:3000
         ▼
-FastAPI backend (Python)  ── SQLite (users, quizzes, study plans)
+Frontend container: React (Vite) built and served by Nginx
+        │  /api/* requests (Nginx reverse proxy)
+        ▼
+Backend container: FastAPI (Python) ── SQLite (users, quizzes, study plans)
         │  prompt (AI replies in JSON)
         ▼
 Google Gemini API (internet)
 ```
-1. The student logs in and fills a form.
-2. FastAPI checks the login token and sends a prompt to the Gemini API.
-3. The AI replies in **structured JSON**, which the backend validates.
-4. Quizzes and plans are saved in SQLite. Correct answers stay on the server until the quiz is submitted.
-5. Study time is split by Python code (so hours always add up); the AI suggests the topics.
+1. The student logs in and fills a form in the React app.
+2. React sends the request to `/api/...`. Nginx forwards it to the FastAPI backend.
+3. FastAPI checks the login token and sends a prompt to the Gemini API.
+4. The AI replies in **structured JSON**, which the backend validates.
+5. Quizzes and plans are saved in SQLite. Correct answers stay on the server until the quiz is submitted.
+6. Study time is split by Python code (so hours always add up); the AI suggests the topics.
 
 ## 4. Technology Stack
 | Part | Technology |
 |---|---|
-| Frontend | HTML, CSS, JavaScript (responsive) |
+| Frontend | **React 18** (Vite), CSS |
+| Web server | **Nginx** (serves React and proxies `/api` to the backend) |
 | Backend | **FastAPI** (Python) |
 | Database | SQLite |
 | AI | **Google Gemini API** |
 | Authentication | Hashed passwords (PBKDF2) + session tokens |
-| Containers | **Docker + Docker Compose** |
+| Containers | **Docker + Docker Compose** (2 services) |
 
 ## 5. API Endpoints
 | Method | Endpoint | Function |
@@ -64,58 +69,66 @@ Google Gemini API (internet)
 | POST | `/api/study-plan/generate` | Generate study plan |
 | GET | `/api/study-plan/history` | Study plan history |
 
-All endpoints except register and login need a valid login token. API test page: `http://127.0.0.1:8000/docs`
+All endpoints except register and login need a valid login token.
 
 ## 6. Project Structure
-SmartStudyAI/
+```
+ai-smart-learning-assistant/
 ├── backend/
 │   ├── main.py               # FastAPI server, database, login, and Gemini AI logic
 │   ├── requirements.txt      # Python packages
 │   └── Dockerfile            # Builds the backend container
 ├── frontend/
-│   └── index.html            # Web interface (all screens)
-├── docker-compose.yml        # Runs the app with Docker
+│   ├── index.html            # Empty page React mounts into
+│   ├── package.json          # React/Vite packages
+│   ├── vite.config.js        # Vite settings
+│   ├── nginx.conf            # Serves React and proxies /api to backend
+│   ├── Dockerfile            # Builds React, then serves it with Nginx
+│   └── src/
+│       ├── main.jsx          # Starts React
+│       ├── App.jsx           # Navbar, sidebar, and screen switching
+│       ├── api.js            # Backend API helper
+│       ├── index.css         # Styles
+│       └── views/            # Landing, Auth, Dashboard, Quiz, Explain, Plan, History
+├── docker-compose.yml        # Runs both services (backend + frontend)
 ├── .env.example              # Template for the API key file (.env is never uploaded)
 ├── .gitignore                # Files not to upload to GitHub
 ├── .dockerignore             # Files not to copy into Docker
 └── README.md                 # This file
-
-## 7. How to Run
-**Requirements:** Windows 10/11, Docker Desktop (WSL2), internet, and a free Gemini API key from **aistudio.google.com** (Get API key).
-
-Open Command Prompt inside the project folder, then:
-```bash
-copy .env.example .env          # first time only
-notepad .env                    # paste your key after GEMINI_API_KEY=, then save
-docker compose up -d --build    # build and start the app
 ```
-Open **http://127.0.0.1:8000**. To stop: `docker compose down`. To see errors: `docker logs ai-api`.
 
-The key is stored only in the local `.env` file, which is never uploaded to GitHub. To check the AI connection, open `http://127.0.0.1:8000/api/health?test=1`.
 
-## 8. Demo Flow
+
+## 8. Docker Compose Services
+| Service | Built from | Port | Role |
+|---|---|---|---|
+| `backend` | `./backend` | 8000 (internal) | FastAPI + SQLite + Gemini |
+| `frontend` | `./frontend` | 3000 → 80 | React app served by Nginx, proxies `/api` to `backend` |
+
+## 9. Demo Flow
 1. Landing page → **Get Started** → register → login.
 2. **Quiz:** Computer Networks / OSI Model / Medium / 5 questions → answer → Submit → see the score.
 3. **Explainer:** Cloud Computing / Kubernetes Pods / Beginner.
 4. **Planner:** 3 subjects, 3 hours/day, an exam date, and a priority subject.
 5. **History:** show saved quizzes and plans.
 
-## 9. Limitations
+## 10. Limitations
 - Needs an internet connection and a Gemini API key; the free tier has rate limits.
 - AI answers can contain mistakes, so important facts should be double-checked.
 - The study plan shows at most the next 14 days.
 - MVP security: no HTTPS, email verification, or password reset.
 
-## 10. Future Improvements
+## 11. Future Improvements
 PDF upload for quizzes, weak-area detection, adaptive difficulty, progress charts, AI chat tutor, study reminders, flashcards, an offline mode with a local model, and deployment on a school server.
 
-## 11. Project Status
+## 12. Project Status
 - [ ] Docker running and Gemini API key added
 - [ ] Backend and database working
+- [ ] React frontend connected to backend
 - [ ] Login and registration working
 - [ ] Quiz, Explainer, and Planner tested
 - [ ] History working
 - [ ] Poster and presentation ready
 
 ---
-*Built with FastAPI, Google Gemini API, SQLite, and Docker.*
+*Built with React, FastAPI, Google Gemini API, SQLite, Nginx, and Docker.*

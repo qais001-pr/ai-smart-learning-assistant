@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException, Header, Depends
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from datetime import date, datetime, timedelta
 import requests, json, os, sqlite3, hashlib, hmac, secrets, random, re, time
@@ -312,5 +311,4 @@ def plan_history(u=Depends(current_user)):
              "exam_date": x["exam_date"], "priority": x["priority"],
              "schedule": json.loads(x["schedule"]), "created_at": x["created_at"]} for x in rows]
 
-# keep this LAST: serves the website
-app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
+# Frontend is now a separate React service (served by nginx), so no static mount here.

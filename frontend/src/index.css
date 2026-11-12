@@ -1,0 +1,32 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f6fb;color:#1d2433}
+h1,h2,h3{margin:.3em 0}
+button{background:#2b4acb;color:#fff;border:0;border-radius:6px;padding:10px 16px;font-size:15px;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+button.alt{background:#fff;color:#2b4acb;border:1px solid #2b4acb}
+input,select{padding:10px;font-size:15px;border:1px solid #c5cbe0;border-radius:6px;width:100%;margin:4px 0 10px}
+label{font-size:14px;font-weight:bold}
+.card{background:#fff;border-radius:10px;padding:16px;margin-bottom:14px;box-shadow:0 2px 6px #0001}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;background:#fff;box-shadow:0 1px 4px #0002}
+.logo{font-size:22px;font-weight:bold;color:#2b4acb}
+.hero{text-align:center;padding:60px 20px}
+.hero h1{font-size:34px;color:#2b4acb}
+.wrap{max-width:900px;margin:0 auto;padding:0 16px}
+.auth{max-width:380px;margin:40px auto}
+#app{min-height:100vh}
+.layout{display:flex}
+.side{width:200px;background:#fff;padding:16px;min-height:100vh;box-shadow:1px 0 4px #0001}
+.side button{display:block;width:100%;text-align:left;background:none;color:#1d2433;margin:4px 0}
+.side button.on{background:#e6ebff;color:#2b4acb;font-weight:bold}
+.main{flex:1;padding:20px;min-width:0}
+.opt{display:block;padding:8px;border:1px solid #dde;border-radius:6px;margin:6px 0;cursor:pointer}
+.opt input{width:auto;margin:0 8px 0 0}
+.ok{border-left:5px solid #2e9e4f}.no{border-left:5px solid #d64545}
+.score{text-align:center;background:#e6ebff}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:8px;border-bottom:1px solid #e3e6f0;text-align:left}
+.err{color:#c00}.muted{color:#667;font-size:14px}
+.scroll{overflow-x:auto}
+@media(max-width:700px){.layout{flex-direction:column}.side{width:100%;min-height:0;display:flex;flex-wrap:wrap;gap:4px}.side button{width:auto}.hero h1{font-size:26px}}
+.ok-msg{color:#080}

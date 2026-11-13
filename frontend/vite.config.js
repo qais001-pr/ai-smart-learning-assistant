@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// In dev (npm run dev) forward /api to the FastAPI backend on port 8000.
+// "npm run dev" sends /api calls to the backend. In Docker, Nginx does this instead.
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173, proxy: { "/api": "http://localhost:8000" } },
+  server: { proxy: { "/api": "http://localhost:8000" } },
 });

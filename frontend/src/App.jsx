@@ -1,81 +1,61 @@
-import { useState, useEffect, useCallback } from "react";
-import { api, getToken, setToken, logoutRequest } from "./api.js";
-import Landing from "./views/Landing.jsx";
-import Auth from "./views/Auth.jsx";
-import Dashboard from "./views/Dashboard.jsx";
-import Quiz from "./views/Quiz.jsx";
-import Explain from "./views/Explain.jsx";
-import Plan from "./views/Plan.jsx";
-import History from "./views/History.jsx";
+import { useEffect, useState } from "react";
+import { api, hasToken, setToken, setExpiredHandler } from "./api";
+import Icon from "./Icons";
+import Auth from "./Auth";
+import Dashboard from "./Dashboard";
+import Quiz from "./Quiz";
+import Explain from "./Explain";
+import Planner from "./Planner";
+import History from "./History";
 
-const TABS = [
-  ["dash", "🏠 Dashboard"],
-  ["quiz", "📝 Quiz"],
-  ["explain", "💡 Explainer"],
-  ["plan", "📅 Study Plan"],
-  ["hist", "🕘 History"],
+const NAV = [
+  ["dash", "home", "Dashboard"], ["quiz", "quiz", "Quiz Generator"], ["explain", "book", "Topic Explainer"],
+  ["plan", "calendar", "Study Planner"], ["hist", "clock", "History"],
 ];
 
 export default function App() {
-  const [screen, setScreen] = useState(getToken() ? "loading" : "landing");
   const [user, setUser] = useState(null);
   const [view, setView] = useState("dash");
 
-  const logout = useCallback(() => {
-    logoutRequest();
-    setToken(null);
-    setUser(null);
-    setScreen("landing");
-  }, []);
+  function enter(u) { setUser(u); setView("dash"); }
+  function logout() {
+    if (hasToken()) api("/api/auth/logout", {}).catch(() => {});
+    setToken(null); setUser(null);
+  }
 
-  // call the API and log out automatically if the session expired
-  const call = useCallback((url, data) => api(url, data, { onExpired: logout }), [logout]);
-
-  const enter = (u) => {
-    setUser(u);
-    setView("dash");
-    setScreen("app");
-  };
-
-  // restore session on page load
   useEffect(() => {
-    if (!getToken()) return;
-    api("/api/me")
-      .then(enter)
-      .catch(() => {
-        setToken(null);
-        setScreen("landing");
-      });
+    setExpiredHandler(() => { setToken(null); setUser(null); });
+    if (hasToken()) api("/api/me").then(enter).catch(() => {});
   }, []);
 
-  if (screen === "loading") return null;
-  if (screen === "landing") return <Landing onLogin={() => setScreen("auth")} />;
-  if (screen === "auth")
-    return <Auth onHome={() => setScreen("landing")} onLoggedIn={enter} />;
+  if (!user) return <Auth onLogin={enter} />;   // before login, the login page is shown
+
+  const title = NAV.find((x) => x[0] === view)[2];
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
 
   return (
-    <div id="app">
-      <div className="nav">
-        <span className="logo">🎓 SmartStudy AI</span>
-        <span>
-          <b>{user.name}</b> <span className="muted">{user.email}</span>{" "}
-          <button className="alt" onClick={logout}>Logout</button>
-        </span>
-      </div>
-      <div className="layout">
-        <div className="side">
-          {TABS.map(([id, label]) => (
-            <button key={id} className={view === id ? "on" : ""} onClick={() => setView(id)}>
-              {label}
-            </button>
+    <div className="shell">
+      <aside className="side">
+        <div className="brand"><Icon name="cap" size={26} /> SmartStudy AI</div>
+        <nav className="nav">
+          {NAV.map(([k, ic, label]) => (
+            <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)}><Icon name={ic} size={19} /> {label}</button>
           ))}
+        </nav>
+        <div className="me">
+          <div className="avatar">{user.name[0].toUpperCase()}</div>
+          <div className="info"><b>{user.name}</b><small>{user.email}</small></div>
+          <button title="Logout" onClick={logout}><Icon name="logout" size={18} /></button>
         </div>
+      </aside>
+      <div className="content">
+        <div className="topbar"><h1>{title}</h1><span className="muted">{today}</span></div>
         <div className="main">
-          {view === "dash" && <Dashboard user={user} call={call} go={setView} />}
-          {view === "quiz" && <Quiz call={call} />}
-          {view === "explain" && <Explain call={call} />}
-          {view === "plan" && <Plan call={call} />}
-          {view === "hist" && <History call={call} />}
+          {view === "dash" && <Dashboard user={user} go={setView} />}
+          {view === "quiz" && <Quiz />}
+          {view === "explain" && <Explain />}
+          {view === "plan" && <Planner />}
+          {view === "hist" && <History />}
         </div>
       </div>
     </div>

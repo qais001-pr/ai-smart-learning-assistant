@@ -1,23 +1,21 @@
 services:
   backend:
     build: ./backend
-    container_name: ai-api
+    container_name: ai-backend
     env_file:
       - .env
+    ports:
+      - "8000:8000"        # API + test page at http://127.0.0.1:8000/docs
     volumes:
       - app_data:/app/data
-    expose:
-      - "8000"          # only reachable inside the compose network
-    restart: unless-stopped
 
   frontend:
     build: ./frontend
-    container_name: ai-web
+    container_name: ai-frontend
     ports:
-      - "3000:80"       # open http://localhost:3000
+      - "3000:80"          # the website: http://127.0.0.1:3000
     depends_on:
       - backend
-    restart: unless-stopped
 
 volumes:
   app_data:

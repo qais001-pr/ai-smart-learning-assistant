@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from datetime import date, datetime, timedelta
 import requests, json, os, sqlite3, hashlib, hmac, secrets, random, re, time
+from concurrent.futures import ThreadPoolExecutor
 
 DB_PATH = os.getenv("DB_PATH", "data/smartstudy.db")
 app = FastAPI(title="SmartStudy AI")
@@ -81,6 +82,8 @@ def me(u=Depends(current_user)): return {"name": u["name"], "email": u["email"]}
 # ---------------- AI helper: Google Gemini API (always asks for JSON) ----------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash").strip()
+THINK = os.getenv("GEMINI_THINKING_LEVEL", "").strip().lower()   # optional: minimal / low / medium / high
+POOL = ThreadPoolExecutor(max_workers=8)                                    # lets several AI calls run at the same time
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent"
 last_error = ""
 
@@ -98,8 +101,9 @@ def ai_fail(msg):
 
 def ask_json(prompt):
     global last_error
-    body = {"contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"}}
+    cfg = {"responseMimeType": "application/json"}
+    if THINK: cfg["thinkingConfig"] = {"thinkingLevel": THINK}   # less "thinking" = faster answers
+    body = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": cfg}
     headers = {"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"}   # key stays on the server
     for attempt in range(3):
         r = requests.post(GEMINI_URL.format(GEMINI_MODEL), headers=headers, json=body, timeout=120)
@@ -117,10 +121,12 @@ def ask_json(prompt):
 @app.get("/api/health")
 def health(test: int = 0):
     """Open /api/health?test=1 in the browser to check your key and model name."""
-    out = {"ai_configured": ai_ready(), "model": GEMINI_MODEL}
+    out = {"ai_configured": ai_ready(), "model": GEMINI_MODEL, "thinking_level": THINK or "default"}
     if test and ai_ready():
+        t0 = time.time()
         try: ask_json('Reply ONLY as JSON like {"ok": true}'); out["test"] = "OK"
         except Exception as e: out["test"] = str(last_error or e)
+        out["seconds"] = round(time.time() - t0, 1)
     return out
 
 def need(text, name, mx=200):
@@ -145,21 +151,27 @@ def clean_q(q):
     except Exception:
         return None
 
+def one_batch(subject, topic, difficulty, k):
+    try:
+        data = ask_json(f'Create {k} {difficulty} multiple choice questions about "{topic}" (subject: {subject}). '
+                        'Exactly 4 different short options each, one correct. Keep each explanation under 12 words. '
+                        'Reply ONLY as JSON like: ' + QFORMAT)
+        return [q for q in map(clean_q, data.get("questions", [])) if q]
+    except Exception:
+        return []
+
 def make_questions(subject, topic, difficulty, n):
+    sizes = [min(5, n - i) for i in range(0, n, 5)]        # e.g. 15 questions -> 3 requests of 5, sent at the same time
+    batches = list(POOL.map(lambda k: one_batch(subject, topic, difficulty, k), sizes))
     qs, seen = [], set()
-    for _ in range(3):                       # ask for the missing questions, up to 3 times
-        if len(qs) >= n: break
-        k = n - len(qs)
-        try:
-            data = ask_json(f'Create {k} {difficulty} multiple choice questions about "{topic}" '
-                            f'(subject: {subject}). Exactly 4 different options each, one correct. '
-                            'Reply ONLY as JSON like: ' + QFORMAT)
-        except Exception:
-            continue
-        for q in data.get("questions", []):
-            q = clean_q(q)
-            if q and q["question"].lower() not in seen and len(qs) < n:
+    def add(items):
+        for q in items:
+            if q["question"].lower() not in seen and len(qs) < n:
                 seen.add(q["question"].lower()); qs.append(q)
+    for b in batches: add(b)
+    for _ in range(2):                                      # top up if some questions were rejected or duplicated
+        if len(qs) >= n: break
+        add(one_batch(subject, topic, difficulty, n - len(qs)))
     return qs
 
 class QuizReq(BaseModel):
@@ -292,7 +304,7 @@ def plan_generate(r: PlanReq, u=Depends(current_user)):
     except ValueError: raise HTTPException(400, "Enter a valid exam date")
     left = (exam - date.today()).days
     if left < 1: raise HTTPException(400, "The exam date must be in the future")
-    got = {s: get_topics(s, r.level) for s in subjects}          # (topics, used_fallback)
+    got = dict(zip(subjects, POOL.map(lambda s: get_topics(s, r.level), subjects)))          # (topics, used_fallback)
     sched = build_schedule(subjects, r.daily_hours, min(left, 14), r.priority.strip(),
                            {s: g[0] for s, g in got.items()})
     with db() as c:
@@ -311,4 +323,6 @@ def plan_history(u=Depends(current_user)):
              "exam_date": x["exam_date"], "priority": x["priority"],
              "schedule": json.loads(x["schedule"]), "created_at": x["created_at"]} for x in rows]
 
-# Frontend is now a separate React service (served by nginx), so no static mount here.
+@app.get("/")
+def root():
+    return {"app": "SmartStudy AI backend", "docs": "/docs"}
